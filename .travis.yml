@@ -1,0 +1,13 @@
+language: go
+go:
+- 1.11.x
+go_import_path: github.com/satnamram/cryptoutil
+install:
+- go get golang.org/x/tools/cmd/cover
+- go get github.com/mattn/goveralls
+- go get -t -v ./...
+- go test -coverprofile=coverage.txt -covermode=count -v ./...
+- "$GOPATH/bin/goveralls -coverprofile=coverage.txt -service=travis-ci"
+env:
+  global:
+    secure: G5U8CReVkbI+RNGpgUKmntr+gSusuwZP9SsEydQS5b8k/VMU/VgQwdzQWz1CCxZuZWGUSOZhiGCuAFPvd9WBP1zyo3rqhB9i4IXA4/ETLz4qlMZEr0nkCH3VrvAxHbz7NKPeVAkNVZUkmu7QYi0F4RAODHuu7R74HXqnZk9+7081YhpZo+hiUhv6af3EiB8Uin1bFkAZA51x7N2j1CKxmnAgSOd3vusB88bYJp30xCmRqdLuYBnk59J09bHUC6H3VbYbnd1Iuq7gHrdLArjeFcXcmzrCDeeQOGIHBAYMCttraroqZ7lrD4jyX5ZogYsDiGTzrkJXLIumHXryx3NtsWbGeI+v4EVBX+xeKj9df1bBLfnJGxLAqhdXigRjGyNhK2JiGuSsTprclQsRXBQsYPPlPaD6rPvcp45u8xiKdiFHtlTitudkY2X6TJki44tcNICbAy2mnN3sHuTxfa8SpRNNMvQnTTpO2wtMc0ODAJXxMCzGBXye1ueCEoM5ZSEEL1gSA7Jw9Lqi7E741AKtzWWOrZKLRAe8OnOlbaujXD49ziA1Yl/sCRzwC6quwQ0U6T4CQRWJcXwTzF5fGDrYLglHGXPTOkUIh1OiQ23IZAsU21vINO5jQRixJq8PVQxwBjD56QSrCAyWzUsxO52F8RMItUJkrF2eMQE9DyXxXAg=
