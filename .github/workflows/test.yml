@@ -18,7 +18,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Checkout dependencies
-      run: go get ./...
+      run: go -t get ./...
     - name: Run linters
       uses: golangci/golangci-lint-action@v2
       with:
@@ -39,6 +39,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Checkout dependencies
-      run: go get ./...
+      run: go -t get ./...
     - name: Run tests
       run: go test -v -covermode=count
