@@ -8,7 +8,6 @@ import (
 	"golang.org/x/crypto/openpgp/armor"
 	"golang.org/x/crypto/openpgp/packet"
 	"io"
-	"io/ioutil"
 )
 
 var pgpConfig = &packet.Config{
@@ -21,136 +20,145 @@ var pgpConfig = &packet.Config{
 	DefaultCompressionAlgo: packet.CompressionZIP,
 }
 
-type Identity struct {
-	Entity *openpgp.Entity
+type Entity struct {
+	entity *openpgp.Entity
 }
 
-
-func CreateIdentity(name, comment, email string) (*Identity, error) {
-
-	e, err := openpgp.NewEntity(name, comment, email, pgpConfig)
+func CreateEntity(name, comment, email string) (*Entity, error) {
+	entity, err := openpgp.NewEntity(name, comment, email, pgpConfig)
 	if err != nil {
 		return nil, err
 	}
-
-	for _, id := range e.Identities {
-		err := id.SelfSignature.SignUserId(id.UserId.Id, e.PrimaryKey, e.PrivateKey, pgpConfig)
+	for _, id := range entity.Identities {
+		err := id.SelfSignature.SignUserId(id.UserId.Id, entity.PrimaryKey, entity.PrivateKey, pgpConfig)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	return &Identity{Entity: e}, nil
+	return &Entity{entity: entity}, nil
 }
 
-func DecodeIdentity(b []byte) (*Identity, error) {
-	r, err := openpgp.ReadKeyRing(bytes.NewBuffer(b))
+func LoadEntity(b []byte) (*Entity, error) {
+	r, err := openpgp.ReadArmoredKeyRing(bytes.NewBuffer(b))
 	if err != nil {
 		return nil, err
 	}
 	if len(r) != 1 {
-		return nil, errors.New("only identities with a single Entity are supported")
+		return nil, errors.New("only entities with a single identity are supported")
 	}
-
-	return &Identity{Entity: r[0]}, nil
+	return &Entity{entity: r[0]}, nil
 }
 
-func ImportIdentity(b []byte) (*Identity, error) {
-	block, err := armor.Decode(bytes.NewBuffer(b))
-	if err != nil {
-		return nil, err
-	}
-	if block.Type != openpgp.PrivateKeyType  {
-		return nil, errors.New("wrong block type")
-	}
-	b, err = ioutil.ReadAll(block.Body)
-	if err != nil {
-		return nil, err
-	}
-	return DecodeIdentity(b)
-}
-
-
-
-
-func (i *Identity) Encode() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := i.Entity.SerializePrivate(buf, pgpConfig)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (i *Identity) UserID() *packet.UserId {
-	for _, id := range i.Entity.Identities {
-		return id.UserId
-	}
-	return nil
-}
-
-func (i *Identity) PublicKey() ([]byte, error) {
+func (e *Entity) PrivateKey() ([]byte, error) {
 	var buf bytes.Buffer
-
-	w, err := armor.Encode(&buf, openpgp.PublicKeyType, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer w.Close()
-
-	err = i.Entity.Serialize(w)
-	if err != nil {
-		return nil, err
-	}
-
-	w.Close()
-	return  buf.Bytes(), nil
-}
-
-func (i *Identity) Export() ([]byte, error) {
-	var buf bytes.Buffer
-
 	w, err := armor.Encode(&buf, openpgp.PrivateKeyType, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer w.Close()
-
-	err = i.Entity.SerializePrivate(w, pgpConfig)
+	err = e.entity.SerializePrivate(w, pgpConfig)
 	if err != nil {
 		return nil, err
 	}
-
 	w.Close()
-	return  buf.Bytes(), nil
+	return buf.Bytes(), nil
 }
 
-func (i *Identity) Sign(r io.Reader) ([]byte, error) {
+func (e *Entity) UserID() *packet.UserId {
+	for _, id := range e.entity.Identities {
+		return id.UserId
+	}
+	return nil
+}
+
+func (e *Entity) PublicKey() ([]byte, error) {
 	var buf bytes.Buffer
-	err := openpgp.ArmoredDetachSign(&buf, i.Entity, r, pgpConfig)
+	w, err := armor.Encode(&buf, openpgp.PublicKeyType, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer w.Close()
+	err = e.entity.Serialize(w)
+	if err != nil {
+		return nil, err
+	}
+	w.Close()
+	return buf.Bytes(), nil
+}
+
+func (e *Entity) Sign(r io.Reader) ([]byte, error) {
+	var buf bytes.Buffer
+	err := openpgp.ArmoredDetachSign(&buf, e.entity, r, pgpConfig)
 	if err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func (i *Identity) Verify(r io.Reader, signature []byte) error {
+func (e *Entity) Encrypt(r io.Reader) ([]byte, error) {
+	var buf bytes.Buffer
+	err := openpgp.ArmoredDetachSign(&buf, e.entity, r, pgpConfig)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (e *Entity) Verify(r io.Reader, signature []byte) error {
 	sig, err := decodeSignature(signature)
 	if err != nil {
 		return err
 	}
-
 	hash := sig.Hash.New()
 	_, err = io.Copy(hash, r)
 	if err != nil {
 		return err
 	}
-
-	err = i.Entity.PrimaryKey.VerifySignature(hash, sig)
+	err = e.entity.PrimaryKey.VerifySignature(hash, sig)
 	if err != nil {
 		return err
 	}
+	return nil
+}
 
+type PublicKey struct {
+	key *packet.PublicKey
+}
+
+func LoadPublicKey(b []byte) (*PublicKey, error) {
+	block, err := armor.Decode(bytes.NewBuffer(b))
+	if err != nil {
+		return nil, err
+	}
+	if block.Type != openpgp.PublicKeyType {
+		return nil, errors.New("Invalid private key file")
+	}
+	reader := packet.NewReader(block.Body)
+	pkt, err := reader.Next()
+	if err != nil {
+		return nil, err
+	}
+	key, ok := pkt.(*packet.PublicKey)
+	if !ok {
+		return nil, errors.New("Invalid public key")
+	}
+	return &PublicKey{key: key}, nil
+}
+
+func (pub *PublicKey) Verify(r io.Reader, signature []byte) error {
+	sig, err := decodeSignature(signature)
+	if err != nil {
+		return err
+	}
+	hash := sig.Hash.New()
+	_, err = io.Copy(hash, r)
+	if err != nil {
+		return err
+	}
+	err = pub.key.VerifySignature(hash, sig)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
