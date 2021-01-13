@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/openpgp/armor"
 	"golang.org/x/crypto/openpgp/packet"
 	"io"
+	"io/ioutil"
 )
 
 var pgpConfig = &packet.Config{
@@ -24,17 +25,6 @@ type Identity struct {
 	Entity *openpgp.Entity
 }
 
-func LoadIdentity(b []byte) (*Identity, error) {
-	r, err := openpgp.ReadKeyRing(bytes.NewBuffer(b))
-	if err != nil {
-		return nil, err
-	}
-	if len(r) != 1 {
-		return nil, errors.New("only identities with a single Entity are supported")
-	}
-
-	return &Identity{Entity: r[0]}, nil
-}
 
 func CreateIdentity(name, comment, email string) (*Identity, error) {
 
@@ -52,6 +42,35 @@ func CreateIdentity(name, comment, email string) (*Identity, error) {
 
 	return &Identity{Entity: e}, nil
 }
+
+func DecodeIdentity(b []byte) (*Identity, error) {
+	r, err := openpgp.ReadKeyRing(bytes.NewBuffer(b))
+	if err != nil {
+		return nil, err
+	}
+	if len(r) != 1 {
+		return nil, errors.New("only identities with a single Entity are supported")
+	}
+
+	return &Identity{Entity: r[0]}, nil
+}
+
+func ImportIdentity(b []byte) (*Identity, error) {
+	block, err := armor.Decode(bytes.NewBuffer(b))
+	if err != nil {
+		return nil, err
+	}
+	if block.Type != openpgp.PrivateKeyType  {
+		return nil, errors.New("wrong block type")
+	}
+	b, err = ioutil.ReadAll(block.Body)
+	if err != nil {
+		return nil, err
+	}
+	return DecodeIdentity(b)
+}
+
+
 
 
 func (i *Identity) Encode() ([]byte, error) {
@@ -80,6 +99,24 @@ func (i *Identity) PublicKey() ([]byte, error) {
 	defer w.Close()
 
 	err = i.Entity.Serialize(w)
+	if err != nil {
+		return nil, err
+	}
+
+	w.Close()
+	return  buf.Bytes(), nil
+}
+
+func (i *Identity) Export() ([]byte, error) {
+	var buf bytes.Buffer
+
+	w, err := armor.Encode(&buf, openpgp.PrivateKeyType, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer w.Close()
+
+	err = i.Entity.SerializePrivate(w, pgpConfig)
 	if err != nil {
 		return nil, err
 	}
