@@ -21,12 +21,9 @@ var pgpConfig = &packet.Config{
 }
 
 type Entity struct {
-	entity *openpgp.Entity
+	PGP *openpgp.Entity
 }
 
-func (e *Entity) PGP() *openpgp.Entity{
-	return e.entity
-}
 
 func CreateEntity(name, comment, email string) (*Entity, error) {
 	entity, err := openpgp.NewEntity(name, comment, email, pgpConfig)
@@ -39,7 +36,7 @@ func CreateEntity(name, comment, email string) (*Entity, error) {
 			return nil, err
 		}
 	}
-	return &Entity{entity: entity}, nil
+	return &Entity{PGP: entity}, nil
 }
 
 func LoadEntity(b []byte) (*Entity, error) {
@@ -50,7 +47,7 @@ func LoadEntity(b []byte) (*Entity, error) {
 	if len(r) != 1 {
 		return nil, errors.New("only entities with a single identity are supported")
 	}
-	return &Entity{entity: r[0]}, nil
+	return &Entity{PGP: r[0]}, nil
 }
 
 func (e *Entity) PrivateKey() ([]byte, error) {
@@ -60,7 +57,7 @@ func (e *Entity) PrivateKey() ([]byte, error) {
 		return nil, err
 	}
 	defer w.Close()
-	err = e.entity.SerializePrivate(w, pgpConfig)
+	err = e.PGP.SerializePrivate(w, pgpConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +66,7 @@ func (e *Entity) PrivateKey() ([]byte, error) {
 }
 
 func (e *Entity) UserID() *packet.UserId {
-	for _, id := range e.entity.Identities {
+	for _, id := range e.PGP.Identities {
 		return id.UserId
 	}
 	return nil
@@ -82,7 +79,7 @@ func (e *Entity) PublicKey() ([]byte, error) {
 		return nil, err
 	}
 	defer w.Close()
-	err = e.entity.Serialize(w)
+	err = e.PGP.Serialize(w)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +89,7 @@ func (e *Entity) PublicKey() ([]byte, error) {
 
 func (e *Entity) Sign(r io.Reader) ([]byte, error) {
 	var buf bytes.Buffer
-	err := openpgp.ArmoredDetachSign(&buf, e.entity, r, pgpConfig)
+	err := openpgp.ArmoredDetachSign(&buf, e.PGP, r, pgpConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +98,7 @@ func (e *Entity) Sign(r io.Reader) ([]byte, error) {
 
 func (e *Entity) Encrypt(r io.Reader) ([]byte, error) {
 	var buf bytes.Buffer
-	err := openpgp.ArmoredDetachSign(&buf, e.entity, r, pgpConfig)
+	err := openpgp.ArmoredDetachSign(&buf, e.PGP, r, pgpConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +115,7 @@ func (e *Entity) Verify(r io.Reader, signature []byte) error {
 	if err != nil {
 		return err
 	}
-	err = e.entity.PrimaryKey.VerifySignature(hash, sig)
+	err = e.PGP.PrimaryKey.VerifySignature(hash, sig)
 	if err != nil {
 		return err
 	}

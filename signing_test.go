@@ -19,14 +19,14 @@ func TestIntegrity(t *testing.T) {
 	assert.NoError(t, err)
 
 	// assert equal private key
-	priv := e.entity.PrivateKey.PrivateKey.(*rsa.PrivateKey)
-	loadedPriv := loadedI.entity.PrivateKey.PrivateKey.(*rsa.PrivateKey)
+	priv := e.PGP.PrivateKey.PrivateKey.(*rsa.PrivateKey)
+	loadedPriv := loadedI.PGP.PrivateKey.PrivateKey.(*rsa.PrivateKey)
 	assert.True(t, equalRSAPrivateKey(priv, loadedPriv))
 
 	// get identitiy
 	key := "name (comment) <name@example.org>"
-	identity := e.entity.Identities[key]
-	loadedIdentity := loadedI.entity.Identities[key]
+	identity := e.PGP.Identities[key]
+	loadedIdentity := loadedI.PGP.Identities[key]
 
 	// compare basic fields
 	assert.Equal(t, identity.Name, loadedIdentity.Name)
