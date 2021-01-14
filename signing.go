@@ -24,6 +24,10 @@ type Entity struct {
 	entity *openpgp.Entity
 }
 
+func (e *Entity) PGP() *openpgp.Entity{
+	return e.entity
+}
+
 func CreateEntity(name, comment, email string) (*Entity, error) {
 	entity, err := openpgp.NewEntity(name, comment, email, pgpConfig)
 	if err != nil {
